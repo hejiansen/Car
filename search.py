@@ -1,115 +1,95 @@
-import cv2
-import pytesseract
 import tkinter as tk
 from tkinter import filedialog
+from tkinter import messagebox
 from PIL import Image, ImageTk
-import re
+from paddleocr import PaddleOCR
+import re  # 用于正则表达式匹配车牌号
 
-# 配置 Tesseract 路径（根据你的安装路径进行修改）
-pytesseract.pytesseract.tesseract_cmd = r'C:\迅雷下载\tesseract-ocr-w64-setup-5.5.0.20241111.exe'
+# 初始化PaddleOCR
+ocr = PaddleOCR(use_angle_cls=True, lang='ch')  # use_angle_cls=True表示启用方向分类器，lang='ch'表示中文车牌识别
 
-# 省份简称列表
-province_codes = ["京", "沪", "津", "渝", "冀", "晋", "蒙", "辽", "吉", "黑", "苏", "浙", "皖", "闽",
-                  "赣", "鲁", "豫", "鄂", "湘", "粤", "桂", "琼", "川", "贵", "云", "藏", "陕", "甘",
-                  "青", "宁", "新"]
-
-
-def preprocess_image(img):
-    """
-    图像预处理：灰度化、边缘检测
-    """
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-    edges = cv2.Canny(blurred, 100, 200)
-    return edges
-
-
-def find_plate_contour(img):
-    """
-    使用轮廓检测找到车牌区域
-    """
-    edges = preprocess_image(img)
-
-    # 找到轮廓
-    contours, _ = cv2.findContours(edges, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    for contour in contours:
-        # 获取边界框
-        x, y, w, h = cv2.boundingRect(contour)
-        aspect_ratio = w / h
-
-        # 车牌通常是宽而扁的矩形
-        if 2 < aspect_ratio < 6 and 1000 < w * h < 30000:
-            plate_img = img[y:y + h, x:x + w]
-            return plate_img
-    return None
-
-
-def recognize_plate(img):
-    """
-    识别车牌号
-    """
-    # 车牌定位
-    plate_img = find_plate_contour(img)
-    if plate_img is None:
-        return "未检测到车牌"
-
-    # 进一步处理车牌区域
-    gray_plate = cv2.cvtColor(plate_img, cv2.COLOR_BGR2GRAY)
-    _, thresh_plate = cv2.threshold(gray_plate, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-
-    # 使用 Tesseract OCR 识别
-    ocr_result = pytesseract.image_to_string(thresh_plate, config='--psm 7')
-
-    # 使用正则表达式提取车牌号
-    plate_pattern = r'[京沪津渝冀晋蒙辽吉黑苏浙皖闽赣鲁豫鄂湘粤桂琼川贵云藏陕甘青宁新][A-Z][A-Z0-9]{5,7}'
-    matches = re.findall(plate_pattern, ocr_result)
-
-    if matches:
-        return matches[0]
-    else:
-        return "未能识别到车牌号"
-
-
-def open_image():
-    # 打开文件选择对话框
-    file_path = filedialog.askopenfilename(filetypes=[("Image Files", "*.jpg;*.jpeg;*.png;*.bmp")])
-    if not file_path:
-        return
-
-    # 读取图片
-    img = cv2.imread(file_path)
-    if img is None:
-        result_label.config(text="无法读取图片", font=("Arial", 16))
-        return
-
-    # 识别车牌
-    plate_number = recognize_plate(img)
-    result_label.config(text=f"车牌识别结果：{plate_number}", font=("Arial", 16))
-
-    # 显示图片
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    img_pil = Image.fromarray(img_rgb)
-    img_pil = img_pil.resize((400, int(img_pil.height * 400 / img_pil.width)))
-    img_tk = ImageTk.PhotoImage(img_pil)
-
-    image_label.config(image=img_tk)
-    image_label.image = img_tk
-
-
-# 创建主窗口
+# 创建窗口
 root = tk.Tk()
-root.title("车牌识别器")
-root.geometry("700x700")
+root.title("车牌识别")
+root.geometry("600x700")  # 调整界面大小
 
-# 创建界面元素
+
+# 上传图片并显示
+def upload_image():
+    file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg;*.jpeg;*.png;*.bmp")])
+    if file_path:
+        try:
+            # 使用PIL打开图像文件
+            img = Image.open(file_path)
+            img.thumbnail((400, 400))  # 缩放图像
+            img_tk = ImageTk.PhotoImage(img)
+
+            # 在界面中显示图片
+            image_label.config(image=img_tk)
+            image_label.image = img_tk  # 保持对图像的引用
+            # 保存图片路径
+            global image_path
+            image_path = file_path
+
+        except Exception as e:
+            messagebox.showerror("错误", f"无法加载图片: {e}")
+
+
+# 识别车牌
+def recognize_license_plate():
+    if not image_path:
+        messagebox.showwarning("警告", "请先上传图片")
+        return
+
+    # 使用PaddleOCR进行车牌识别
+    result = ocr.ocr(image_path, cls=True)
+
+    # 输出OCR识别结果
+    print("完整OCR识别结果：")
+    for line in result[0]:
+        print(line[1])  # 打印每行识别到的文本
+
+    # 将所有识别结果显示到界面上
+    all_texts = []
+    plate_numbers = []
+    for line in result[0]:
+        if isinstance(line[1], tuple) and isinstance(line[1][0], str):
+            text = line[1][0]  # 提取文本
+            all_texts.append(text)  # 收集所有识别到的文本
+
+            # 正则表达式匹配车牌号
+            # 支持普通车牌和新能源车牌号（带点）
+            if re.match(r'^[\u4e00-\u9fa5][A-Z0-9]{5,6}•?[A-Z0-9]{1}$', text):
+                plate_numbers.append(text)
+
+    # 显示车牌号或者未识别到的信息
+    if plate_numbers:
+        result_text = "识别的车牌号:\n" + "\n".join(plate_numbers)
+    else:
+        result_text = "未能识别到车牌号\n\n所有OCR识别结果:\n" + "\n".join(all_texts)
+
+    result_label.config(state='normal')  # 允许更新文本框内容
+    result_label.delete(1.0, tk.END)  # 清空文本框内容
+    result_label.insert(tk.END, result_text)  # 插入识别结果
+    result_label.config(state='disabled')  # 禁止编辑文本框内容
+
+
+# 设置界面组件
 image_label = tk.Label(root)
-image_label.pack(pady=10)
+image_label.pack(pady=20)
 
-result_label = tk.Label(root, text="车牌识别结果：", font=("Arial", 16))
-result_label.pack(pady=10)
+upload_button = tk.Button(root, text="上传图片", command=upload_image, width=20)
+upload_button.pack(pady=10)
 
-open_button = tk.Button(root, text="选择图片", command=open_image, font=("Arial", 14), width=20, height=2)
-open_button.pack(pady=20)
+recognize_button = tk.Button(root, text="识别车牌号", command=recognize_license_plate, width=20)
+recognize_button.pack(pady=10)
 
-# 启动主循环
+# 使用Text组件显示多个车牌号或调试结果
+result_label = tk.Text(root, width=60, height=15, font=("Arial", 14), state='disabled', wrap='word')
+result_label.pack(pady=20)
+
+# 初始化全局变量
+image_path = ""
+
+# 运行Tkinter主循环
 root.mainloop()
