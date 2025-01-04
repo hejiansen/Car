@@ -1,16 +1,29 @@
-# 这是一个示例 Python 脚本。
+import cv2
+import pytesseract
+from PIL import Image
 
-# 按 Shift+F10 执行或将其替换为您的代码。
-# 按 双击 Shift 在所有地方搜索类、文件、工具窗口、操作和设置。
-
-
-def print_hi(name):
-    # 在下面的代码行中使用断点来调试脚本。
-    print(f'Hi, {name}')  # 按 Ctrl+F8 切换断点。
+# 设置Tesseract的路径
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'  # 根据你的安装路径修改
 
 
-# 按装订区域中的绿色按钮以运行脚本。
-if __name__ == '__main__':
-    print_hi('PyCharm')
+def recognize_license_plate(image_path):
+    # 读取图像
+    image = cv2.imread(image_path)
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-# 访问 https://www.jetbrains.com/help/pycharm/ 获取 PyCharm 帮助
+    # 应用阈值化以提高识别效果
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    # 使用PIL库将图像转换为PIL图像
+    pil_image = Image.fromarray(thresh)
+
+    # 使用pytesseract进行OCR识别
+    text = pytesseract.image_to_string(pil_image, lang='eng')
+
+    # 打印识别结果
+    print("识别的车牌号是:", text.strip())
+
+
+# 调用函数
+image_path = 'path_to_your_image.jpg'  # 替换为你的图片路径
+recognize_license_plate(image_path)
