@@ -59,7 +59,7 @@ def recognize_license_plate():
 
             # 正则表达式匹配车牌号
             # 支持普通车牌和新能源车牌号（带点）
-            if re.match(r'^[\u4e00-\u9fa5][A-Z0-9]{5,6}•?[A-Z0-9]{1}$', text):
+            if re.match(r'[\u4e00-\u9fa5][A-Z].?[A-Z0-9]{4,6}[\u4e00-\u9fa5]?$', text):
                 plate_numbers.append(text)
 
     # 显示车牌号或者未识别到的信息
