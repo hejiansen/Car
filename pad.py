@@ -117,7 +117,7 @@ def recognize_license_plate():
         if plate_numbers:
             result_text = "识别的车牌号:\n" + "\n".join(plate_numbers)
         else:
-            result_text = "未能识别到车牌号\n\n所有OCR识别结果:\n" + "\n".join(all_texts)
+            result_text = "未能识别到车牌号\n\n所有识别结果:\n" + "\n".join(all_texts)
 
         result_label.config(state='normal')  # 允许更新文本框内容
         result_label.delete(1.0, tk.END)  # 清空文本框内容
